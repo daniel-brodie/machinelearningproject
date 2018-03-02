@@ -1,0 +1,61 @@
+---
+title: "Machine Learning Project"
+author: "Daniel Brodie"
+date: "March 1, 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Executive Summary
+
+This R Markdown document contains the code to train a model to predict exercise types from a collection of data captured from a weight lifting sample.  The data is available from <http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har>.
+
+## Data Import and Cleaning
+
+The code below loads the data and removes variables that have either near-zero variance, variables with many NA values, and variables that are not related to the activity capture (including, for example, the individual's name and timestamps).
+```{r}
+
+library(caret)
+library(dplyr)
+
+training <- read.csv("pml-training.csv")
+
+#remove Near Zero Variance
+nzv <- nearZeroVar(training,names=TRUE)
+mydata <- select(training,-one_of(nzv))
+
+#remove variables with many NA values
+nav <- colnames(mydata)[colSums(is.na(mydata))>19000]
+mydata <- select(mydata,-one_of(nav))
+
+#remove non-data variables
+nondata <- c("X","raw_timestamp_part_1","raw_timestamp_part_2","cvtd_timestamp","num_window","user_name")
+mydata <- select(mydata,-one_of(nondata))
+
+```
+
+## Split data into training and testing datasets
+``` {r}
+inTrain = createDataPartition(mydata$classe,p=.75, list=FALSE)
+sub.train <- mydata[inTrain,]
+sub.test <- mydata[-inTrain,]
+
+```
+## Fit a Random Forrest Model
+
+Note, this is using k-fold cross validation.  Also note, for speed sake, the code used to train the model is included below, but the model is loaded from disk.
+``` {r}
+train_control<- trainControl(method="cv", number=10, verboseIter = FALSE)
+#mod1 <- train(classe~.,data=sub.train,method="rf", trControl=train_control)
+load('model.rda')
+```
+
+## Estimate Out of Sample error rate by running sub.test against model
+``` {r}
+pred.sub <- predict(mod1,sub.test)
+c1 <- confusionMatrix(pred.sub,sub.test$classe)
+c1$overall[1]
+```
